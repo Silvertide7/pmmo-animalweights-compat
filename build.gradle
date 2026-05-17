@@ -66,7 +66,6 @@ neoForge {
 
         server {
             server()
-            programArgument '--nogui'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -125,7 +124,8 @@ configurations {
 dependencies {
     implementation "curse.maven:pmmo-353935:${pmmo_version}"
     implementation "curse.maven:animal-weight-1544774:${animal_weight_version}"
-    implementation "curse.maven:farmers-delight-398521:${farmers_delight_version}"
+    compileOnly    "curse.maven:farmers-delight-398521:${farmers_delight_version}"
+    localRuntime   "curse.maven:farmers-delight-398521:${farmers_delight_version}"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

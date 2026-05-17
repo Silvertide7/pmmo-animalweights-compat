@@ -15,6 +15,7 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.BabyEntitySpawnEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.silvertide.pmmo_animalweights_compat.PMMOAnimalWeights;
 import net.silvertide.pmmo_animalweights_compat.compat.FarmersDelightCompat;
 import net.silvertide.pmmo_animalweights_compat.config.ServerConfigs;
@@ -28,32 +29,20 @@ public class AnimalWeightEvents {
 
     private static final boolean FD_LOADED = ModList.get().isLoaded("farmersdelight");
 
-    private static final Map<Integer, Double> killMultiplier = Map.of(
-            0, 0D,
-            1, 0D,
-            2, 1.5D,
-            3, 2.5D,
-            4, 4D,
-            5, 6D,
-            6, 9D,
-            7, 12D,
-            8, 17D
-    );
-
-
     @SubscribeEvent()
     public static void onAnimalDeath(LivingDeathEvent livingDeathEvent) {
         if(!(livingDeathEvent.getEntity() instanceof Animal animal)) return;
         if(!(livingDeathEvent.getSource().getEntity() instanceof ServerPlayer killer)) return;
 
         int weight = Math.clamp(WeightAttachment.getWeight(animal), 0, 8);
-        if(weight < 2) return;
+        double base = ServerConfigs.multiplierFor(ServerConfigs.KILL_MULTIPLIERS.get(), weight);
+        if (base <= 0.0) return;
 
         ItemStack weapon = livingDeathEvent.getSource().getWeaponItem();
         double knifeBonus = (FD_LOADED && FarmersDelightCompat.isKnife(weapon))
                 ? ServerConfigs.FARMERS_DELIGHT_KNIFE_KILL_BONUS.get()
                 : 1.0;
-        double multiplier = killMultiplier.get(weight) * knifeBonus;
+        double multiplier = base * knifeBonus;
 
         Map<String, Long> scaled = new HashMap<>();
         APIUtils.getXpAwardMap(animal, ServerConfigs.KILL_EVENT_TYPE.get(), LogicalSide.SERVER, killer)
@@ -64,17 +53,43 @@ public class AnimalWeightEvents {
         if (!scaled.isEmpty()) Core.get(LogicalSide.SERVER).awardXP(List.of(killer), scaled);
     }
 
-    private static final Map<Integer, Double> breedMultiplier = Map.of(
-            0, 0D,
-            1, 0D,
-            2, 1.0D,
-            3, 1.5D,
-            4, 2D,
-            5, 2.5D,
-            6, 3D,
-            7, 5D,
-            8, 7D
-    );
+    @SubscribeEvent()
+    public static void onAnimalFed(PlayerInteractEvent.EntityInteract event) {
+        if (event.getLevel().isClientSide()) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getTarget() instanceof Animal animal)) return;
+
+        ItemStack stack = event.getItemStack();
+        if (!animal.isFood(stack)) return;
+        if (animal.getAge() != 0) return;
+        if (animal.isInLove()) return;
+        if (!animal.canFallInLove()) return;
+
+        double feedMultiplier = ServerConfigs.FEED_XP_MULTIPLIER.get();
+        if (feedMultiplier >= 0.0) {
+            Map<String, Long> scaled = new HashMap<>();
+            APIUtils.getXpAwardMap(animal, ServerConfigs.FEED_EVENT_TYPE.get(), LogicalSide.SERVER, player)
+                    .forEach((skill, xp) -> {
+                        long s = Math.round(xp * feedMultiplier);
+                        if (s > 0) scaled.put(skill, s);
+                    });
+            if (!scaled.isEmpty()) Core.get(LogicalSide.SERVER).awardXP(List.of(player), scaled);
+        }
+
+        int maxWeight = ServerConfigs.FEED_WEIGHT_MAX_WEIGHT.get();
+        int currentWeight = WeightAttachment.getWeight(animal);
+        if (currentWeight >= maxWeight) return;
+
+        long level = APIUtils.getLevel(ServerConfigs.FEED_WEIGHT_SKILL.get(), player);
+        double chance = Math.min(
+                ServerConfigs.FEED_WEIGHT_MAX_CHANCE.get(),
+                level * ServerConfigs.FEED_WEIGHT_CHANCE_PER_LEVEL.get());
+        if (chance <= 0.0) return;
+
+        if (animal.getRandom().nextDouble() < chance) {
+            WeightAttachment.setWeight(animal, currentWeight + 1);
+        }
+    }
 
     @SubscribeEvent()
     public static void onAnimalBorn(BabyEntitySpawnEvent babyEntitySpawnEvent) {
@@ -85,9 +100,22 @@ public class AnimalWeightEvents {
         int weightA = WeightAttachment.getWeight(parentA);
         int weightB = WeightAttachment.getWeight(parentB);
 
+        // Set the breed cooldown longer for animals
+        MinecraftServer server = parentA.level().getServer();
+        if (server == null) return;
+        int breedCooldownTicks = ServerConfigs.ANIMAL_BREED_COOLDOWN_SECONDS.get() * 20;
+
+        // This is the default minecraft time, skip if no change
+        if(breedCooldownTicks != 6000) {
+            server.tell(new TickTask(server.getTickCount() + 1, () -> {
+                parentA.setAge(breedCooldownTicks);
+                parentB.setAge(breedCooldownTicks);
+            }));
+        }
+
         int averageWeight = Math.clamp((weightA + weightB) / 2, 0, 8);
-        if (averageWeight < 2) return;
-        double multiplier = breedMultiplier.get(averageWeight);
+        double multiplier = ServerConfigs.multiplierFor(ServerConfigs.BREED_MULTIPLIERS.get(), averageWeight);
+        if (multiplier <= 0.0) return;
 
         Map<String, Long> scaled = new HashMap<>();
         APIUtils.getXpAwardMap(parentA, ServerConfigs.BREED_EVENT_TYPE.get(), LogicalSide.SERVER, player)
@@ -96,15 +124,5 @@ public class AnimalWeightEvents {
                     if (s > 0) scaled.put(skill, s);
                 });
         if (!scaled.isEmpty()) Core.get(LogicalSide.SERVER).awardXP(List.of(player), scaled);
-
-        // Set the breed cooldown longer for animals
-        MinecraftServer server = parentA.level().getServer();
-        if (server == null) return;
-        int breedCooldownTicks = ServerConfigs.ANIMAL_BREED_COOLDOWN_SECONDS.get() * 20;
-
-        server.tell(new TickTask(server.getTickCount() + 1, () -> {
-            parentA.setAge(breedCooldownTicks);
-            parentB.setAge(breedCooldownTicks);
-        }));
     }
 }
