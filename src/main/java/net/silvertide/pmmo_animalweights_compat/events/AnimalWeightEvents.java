@@ -34,7 +34,7 @@ public class AnimalWeightEvents {
         if(!(livingDeathEvent.getEntity() instanceof Animal animal)) return;
         if(!(livingDeathEvent.getSource().getEntity() instanceof ServerPlayer killer)) return;
 
-        int weight = Math.clamp(WeightAttachment.getWeight(animal), 0, 8);
+        int weight = WeightAttachment.getWeight(animal);
         double base = ServerConfigs.multiplierFor(ServerConfigs.KILL_MULTIPLIERS.get(), weight);
         if (base <= 0.0) return;
 
@@ -62,33 +62,40 @@ public class AnimalWeightEvents {
         ItemStack stack = event.getItemStack();
         if (!animal.isFood(stack)) return;
         if (animal.getAge() != 0) return;
-        if (animal.isInLove()) return;
         if (!animal.canFallInLove()) return;
 
-        double feedMultiplier = ServerConfigs.FEED_XP_MULTIPLIER.get();
-        if (feedMultiplier >= 0.0) {
-            Map<String, Long> scaled = new HashMap<>();
-            APIUtils.getXpAwardMap(animal, ServerConfigs.FEED_EVENT_TYPE.get(), LogicalSide.SERVER, player)
-                    .forEach((skill, xp) -> {
-                        long s = Math.round(xp * feedMultiplier);
-                        if (s > 0) scaled.put(skill, s);
-                    });
-            if (!scaled.isEmpty()) Core.get(LogicalSide.SERVER).awardXP(List.of(player), scaled);
-        }
+        MinecraftServer server = player.server;
+        if (server == null) return;
 
-        int maxWeight = ServerConfigs.FEED_WEIGHT_MAX_WEIGHT.get();
-        int currentWeight = WeightAttachment.getWeight(animal);
-        if (currentWeight >= maxWeight) return;
+        server.tell(new TickTask(server.getTickCount() + 1, () -> {
+            if (!animal.isAlive() || !animal.isInLove()) return;
+            if (animal.getLoveCause() != player) return;
 
-        long level = APIUtils.getLevel(ServerConfigs.FEED_WEIGHT_SKILL.get(), player);
-        double chance = Math.min(
-                ServerConfigs.FEED_WEIGHT_MAX_CHANCE.get(),
-                level * ServerConfigs.FEED_WEIGHT_CHANCE_PER_LEVEL.get());
-        if (chance <= 0.0) return;
+            double feedMultiplier = ServerConfigs.FEED_XP_MULTIPLIER.get();
+            if (feedMultiplier > 0.0) {
+                Map<String, Long> scaled = new HashMap<>();
+                APIUtils.getXpAwardMap(animal, ServerConfigs.FEED_EVENT_TYPE.get(), LogicalSide.SERVER, player)
+                        .forEach((skill, xp) -> {
+                            long s = Math.round(xp * feedMultiplier);
+                            if (s > 0) scaled.put(skill, s);
+                        });
+                if (!scaled.isEmpty()) Core.get(LogicalSide.SERVER).awardXP(List.of(player), scaled);
+            }
 
-        if (animal.getRandom().nextDouble() < chance) {
-            WeightAttachment.setWeight(animal, currentWeight + 1);
-        }
+            int maxWeight = ServerConfigs.FEED_WEIGHT_MAX_WEIGHT.get();
+            int currentWeight = WeightAttachment.getWeight(animal);
+            if (currentWeight >= maxWeight) return;
+
+            long level = APIUtils.getLevel(ServerConfigs.FEED_WEIGHT_SKILL.get(), player);
+            double chance = Math.min(
+                    ServerConfigs.FEED_WEIGHT_MAX_CHANCE.get(),
+                    level * ServerConfigs.FEED_WEIGHT_CHANCE_PER_LEVEL.get());
+            if (chance <= 0.0) return;
+
+            if (animal.getRandom().nextDouble() < chance) {
+                WeightAttachment.setWeight(animal, currentWeight + 1);
+            }
+        }));
     }
 
     @SubscribeEvent()
@@ -100,12 +107,10 @@ public class AnimalWeightEvents {
         int weightA = WeightAttachment.getWeight(parentA);
         int weightB = WeightAttachment.getWeight(parentB);
 
-        // Set the breed cooldown longer for animals
-        MinecraftServer server = parentA.level().getServer();
+        MinecraftServer server = player.server;
         if (server == null) return;
         int breedCooldownTicks = ServerConfigs.ANIMAL_BREED_COOLDOWN_SECONDS.get() * 20;
 
-        // This is the default minecraft time, skip if no change
         if(breedCooldownTicks != 6000) {
             server.tell(new TickTask(server.getTickCount() + 1, () -> {
                 parentA.setAge(breedCooldownTicks);
@@ -113,7 +118,7 @@ public class AnimalWeightEvents {
             }));
         }
 
-        int averageWeight = Math.clamp((weightA + weightB) / 2, 0, 8);
+        int averageWeight = (weightA + weightB) / 2;
         double multiplier = ServerConfigs.multiplierFor(ServerConfigs.BREED_MULTIPLIERS.get(), averageWeight);
         if (multiplier <= 0.0) return;
 

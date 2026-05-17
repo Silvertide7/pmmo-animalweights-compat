@@ -31,22 +31,17 @@ public class ServerConfigs {
         BUILDER.comment("Which PMMO EventType to look up on the parent entity when awarding XP for breeding. Defaults to BREED.");
         BREED_EVENT_TYPE = BUILDER.defineEnum("breedEventType", EventType.BREED);
 
-        BUILDER.comment("Which PMMO EventType to look up on the animal entity when awarding XP for feeding it into love mode. Defaults to TAMING.");
-        FEED_EVENT_TYPE = BUILDER.defineEnum("feedEventType", EventType.TAMING);
-
-        BUILDER.comment("Flat multiplier applied to the entity's PMMO award map for the feedEventType when a player feeds an animal into love mode.");
-        FEED_XP_MULTIPLIER = BUILDER.defineInRange("feedXpMultiplier", 0.2, 0.0, 100.0);
-
         BUILDER.comment(
-                "Kill XP multiplier indexed by animal weight (0-8). List should have exactly 9 entries.",
-                "Index 0 = weight 0, index 8 = weight 8. Weights below 2 award no XP by default.",
-                "Multiplier is applied to the entity's PMMO award map for the killEventType.");
+                "Kill XP multiplier indexed by animal weight. Defaults cover weights 0-8.",
+                "Index 0 = weight 0. Any weight without a corresponding entry (list too short, or weight out of range) awards no XP.",
+                "Weights below 2 award no XP by default. Multiplier is applied to the entity's PMMO award map for the killEventType.");
         KILL_MULTIPLIERS = BUILDER.defineList("killMultipliers",
                 List.of(0.0, 0.0, 1.5, 2.5, 4.0, 6.0, 9.0, 12.0, 17.0),
                 obj -> obj instanceof Number n && n.doubleValue() >= 0.0);
 
         BUILDER.comment(
-                "Breed XP multiplier indexed by the average weight of the two parents (0-8). List should have exactly 9 entries.",
+                "Breed XP multiplier indexed by the average weight of the two parents. Defaults cover weights 0-8.",
+                "Any average weight without a corresponding entry (list too short, or weight out of range) awards no XP.",
                 "Multiplier is applied to the parent's PMMO award map for the breedEventType.");
         BREED_MULTIPLIERS = BUILDER.defineList("breedMultipliers",
                 List.of(0.0, 0.0, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0, 7.0),
@@ -61,7 +56,13 @@ public class ServerConfigs {
 
         BUILDER.pop();
 
-        BUILDER.push("Feed Weight Gain");
+        BUILDER.push("Animal Feeding");
+
+        BUILDER.comment("Which PMMO EventType to look up on the animal entity when awarding XP for feeding it into love mode. Defaults to TAMING.");
+        FEED_EVENT_TYPE = BUILDER.defineEnum("feedEventType", EventType.TAMING);
+
+        BUILDER.comment("Flat multiplier applied to the entity's PMMO award map for the feedEventType when a player feeds an animal into love mode.");
+        FEED_XP_MULTIPLIER = BUILDER.defineInRange("feedXpMultiplier", 0.2, 0.0, 100.0);
 
         BUILDER.comment("PMMO skill checked when a player feeds an animal into love mode. Higher levels increase the chance the animal gains 1 weight.");
         FEED_WEIGHT_SKILL = BUILDER.define("feedWeightSkill", "taming");
