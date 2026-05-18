@@ -7,15 +7,17 @@ import harmonised.pmmo.core.Core;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.LogicalSide;
-import net.neoforged.fml.ModList;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.living.BabyEntitySpawnEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.entity.living.BabyEntitySpawnEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.LogicalSide;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.common.Mod;
 import net.silvertide.pmmo_animalweights_compat.PMMOAnimalWeights;
 import net.silvertide.pmmo_animalweights_compat.compat.FarmersDelightCompat;
 import net.silvertide.pmmo_animalweights_compat.config.ServerConfigs;
@@ -24,12 +26,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@EventBusSubscriber(modid = PMMOAnimalWeights.MODID)
+@Mod.EventBusSubscriber(modid = PMMOAnimalWeights.MODID)
 public class AnimalWeightEvents {
 
     private static final boolean FD_LOADED = ModList.get().isLoaded("farmersdelight");
 
-    @SubscribeEvent()
+    @SubscribeEvent
     public static void onAnimalDeath(LivingDeathEvent livingDeathEvent) {
         if(!(livingDeathEvent.getEntity() instanceof Animal animal)) return;
         if(!(livingDeathEvent.getSource().getEntity() instanceof ServerPlayer killer)) return;
@@ -38,7 +40,9 @@ public class AnimalWeightEvents {
         double base = ServerConfigs.multiplierFor(ServerConfigs.KILL_MULTIPLIERS.get(), weight);
         if (base <= 0.0) return;
 
-        ItemStack weapon = livingDeathEvent.getSource().getWeaponItem();
+        // 1.20.1 has no DamageSource#getWeaponItem(); fall back to the direct entity's main hand.
+        Entity direct = livingDeathEvent.getSource().getDirectEntity();
+        ItemStack weapon = (direct instanceof LivingEntity le) ? le.getMainHandItem() : ItemStack.EMPTY;
         double knifeBonus = (FD_LOADED && FarmersDelightCompat.isKnife(weapon))
                 ? ServerConfigs.FARMERS_DELIGHT_KNIFE_KILL_BONUS.get()
                 : 1.0;
@@ -53,7 +57,7 @@ public class AnimalWeightEvents {
         if (!scaled.isEmpty()) Core.get(LogicalSide.SERVER).awardXP(List.of(killer), scaled);
     }
 
-    @SubscribeEvent()
+    @SubscribeEvent
     public static void onAnimalFed(PlayerInteractEvent.EntityInteract event) {
         if (event.getLevel().isClientSide()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -98,7 +102,7 @@ public class AnimalWeightEvents {
         }));
     }
 
-    @SubscribeEvent()
+    @SubscribeEvent
     public static void onAnimalBorn(BabyEntitySpawnEvent babyEntitySpawnEvent) {
         if(!(babyEntitySpawnEvent.getCausedByPlayer() instanceof ServerPlayer player)) return;
         if(!(babyEntitySpawnEvent.getParentA() instanceof Animal parentA)) return;

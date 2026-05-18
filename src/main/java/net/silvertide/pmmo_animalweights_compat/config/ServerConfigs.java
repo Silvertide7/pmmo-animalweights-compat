@@ -1,26 +1,26 @@
 package net.silvertide.pmmo_animalweights_compat.config;
 
 import harmonised.pmmo.api.enums.EventType;
-import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.util.List;
 
 public class ServerConfigs {
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
-    public static final ModConfigSpec SPEC;
+    private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
+    public static final ForgeConfigSpec SPEC;
 
-    public static final ModConfigSpec.IntValue ANIMAL_BREED_COOLDOWN_SECONDS;
-    public static final ModConfigSpec.DoubleValue FARMERS_DELIGHT_KNIFE_KILL_BONUS;
-    public static final ModConfigSpec.EnumValue<EventType> KILL_EVENT_TYPE;
-    public static final ModConfigSpec.EnumValue<EventType> BREED_EVENT_TYPE;
-    public static final ModConfigSpec.EnumValue<EventType> FEED_EVENT_TYPE;
-    public static final ModConfigSpec.DoubleValue FEED_XP_MULTIPLIER;
-    public static final ModConfigSpec.ConfigValue<List<? extends Number>> KILL_MULTIPLIERS;
-    public static final ModConfigSpec.ConfigValue<List<? extends Number>> BREED_MULTIPLIERS;
-    public static final ModConfigSpec.ConfigValue<String> FEED_WEIGHT_SKILL;
-    public static final ModConfigSpec.DoubleValue FEED_WEIGHT_CHANCE_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue FEED_WEIGHT_MAX_CHANCE;
-    public static final ModConfigSpec.IntValue FEED_WEIGHT_MAX_WEIGHT;
+    public static final ForgeConfigSpec.IntValue ANIMAL_BREED_COOLDOWN_SECONDS;
+    public static final ForgeConfigSpec.DoubleValue FARMERS_DELIGHT_KNIFE_KILL_BONUS;
+    public static final ForgeConfigSpec.EnumValue<EventType> KILL_EVENT_TYPE;
+    public static final ForgeConfigSpec.EnumValue<EventType> BREED_EVENT_TYPE;
+    public static final ForgeConfigSpec.EnumValue<EventType> FEED_EVENT_TYPE;
+    public static final ForgeConfigSpec.DoubleValue FEED_XP_MULTIPLIER;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends Number>> KILL_MULTIPLIERS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends Number>> BREED_MULTIPLIERS;
+    public static final ForgeConfigSpec.ConfigValue<String> FEED_WEIGHT_SKILL;
+    public static final ForgeConfigSpec.DoubleValue FEED_WEIGHT_CHANCE_PER_LEVEL;
+    public static final ForgeConfigSpec.DoubleValue FEED_WEIGHT_MAX_CHANCE;
+    public static final ForgeConfigSpec.IntValue FEED_WEIGHT_MAX_WEIGHT;
 
     static {
         BUILDER.push("Animal XP");
@@ -88,7 +88,6 @@ public class ServerConfigs {
         SPEC = BUILDER.build();
     }
 
-    // Returns the multiplier at `weight`, or 0.0 if the configured list is shorter than expected.
     public static double multiplierFor(List<? extends Number> list, int weight) {
         return (weight >= 0 && weight < list.size()) ? list.get(weight).doubleValue() : 0.0;
     }
